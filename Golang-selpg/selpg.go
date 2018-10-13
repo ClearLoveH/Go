@@ -3,30 +3,37 @@ package main
 import(
 	"fmt"
 	"os"
-	flag "github.com/spf13/pflag"
 	"bufio"
 	"io"
 	"os/exec"
 	"errors"
+	flag "github.com/spf13/pflag"
 )
 
-var(
-	start_page int
-	end_page int
-	page_length int
-	in_filename string
-	print_dest string
-	page_type bool
-	help bool
-)
+var	help bool
+var	start_page int
+var	end_page int
+var	page_length int
+var	in_filename string
+var	print_dest string
+var	page_type bool
 
+
+//参数绑定
 func init(){
-	flag.IntVarP(&start_page, "start", "s",-1, "Define start page of select pages")
-	flag.IntVarP(&end_page, "end", "e",-1, "Define end page of select pages")
-	flag.IntVarP(&page_length, "pl", "l", 72, "Define lines of every select page")
-	flag.StringVarP(&print_dest, "pd", "d", "", "Define the path of the output destination")
-	flag.BoolVarP(&page_type, "pt", "f", false, "Define the type of every select page")
+
 	flag.BoolVarP(&help, "help", "h", false, "Show usage of selpg")
+
+	flag.IntVarP(&start_page, "start", "s",0, "Define start page of select pages")
+
+	flag.IntVarP(&end_page, "end", "e",0, "Define end page of select pages")
+
+	flag.IntVarP(&page_length, "pl", "l", 72, "Define lines of every select page")
+
+	flag.StringVarP(&print_dest, "pd", "d", "", "Define the path of the output destination")
+	
+	flag.BoolVarP(&page_type, "pt", "f", false, "Define the type of every select page")
+
 }
 
 func main(){
@@ -39,16 +46,16 @@ func main(){
 	//handle main arguments
 	if help{
 		flag.Usage()
-	}else if start_page == -1 {
-		fmt.Fprintf(os.Stderr, "Missing selpg 1st argument: -s start_page\n")
+	}else if start_page <= 0 {
+		fmt.Fprintf(os.Stderr, "Invalid input argument：-s start_page\n")
 		flag.Usage()
 		os.Exit(1)
-	}else if end_page == -1 {
-		fmt.Fprintf(os.Stderr, "Missing selpg 2nd argument: -e end_page\n")
+	}else if end_page <= 0 {
+		fmt.Fprintf(os.Stderr, "Invalid input argument：-e end_page\n")
 		flag.Usage()
 		os.Exit(2)
 	}else if start_page > end_page {
-		fmt.Fprintf(os.Stderr, "Invalid pair of start_page and end_page\n")
+		fmt.Fprintf(os.Stderr, "The start_page cannot be greater than the end_page\n")
 		flag.Usage()
 		os.Exit(3)
 	}
