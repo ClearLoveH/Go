@@ -1,162 +1,157 @@
 package main
 
-import(
-	"fmt"
-	"os"
-	"bufio"
-	"io"
-	"os/exec"
-	"errors"
+import (
 	flag "github.com/spf13/pflag"
+	"bufio"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
 )
 
-var	help bool
-var	start_page int
-var	end_page int
-var	page_length int
-var	in_filename string
-var	print_dest string
-var	page_type bool
-
-
-//参数绑定
-func init(){
-
-	flag.BoolVarP(&help, "help", "h", false, "Show usage of selpg")
-
-	flag.IntVarP(&start_page, "start", "s",0, "Define start page of select pages")
-
-	flag.IntVarP(&end_page, "end", "e",0, "Define end page of select pages")
-
-	flag.IntVarP(&page_length, "pl", "l", 72, "Define lines of every select page")
-
-	flag.StringVarP(&print_dest, "pd", "d", "", "Define the path of the output destination")
-	
-	flag.BoolVarP(&page_type, "pt", "f", false, "Define the type of every select page")
-
+type selpg_args struct {
+	start_page, end_page, lines_per_page, page_type int
+	inFilename,	printDest                       string
 }
 
-func main(){
-	flag.Usage = func(){
-		fmt.Fprintf(os.Stderr, "\nUsage: selpg [-s start_page] [-e end_page] [options] [in_filename] \nOptions: \n")
+//参数绑定
+var inputS = flag.IntP("start_page", "s", -1, "(Mandatory) Input Your start_page")
+var inputE = flag.IntP("end_page", "e", -1, "(Mandatory) Input Your end_page")
+var inputL = flag.IntP("lines_per_page", "l", 20, "(Optional) Choosing lines_per_page mode, enter lines_per_page")
+var inputF = flag.BoolP("pageBreak", "f", false, "(Optional) Choosing pageBreaks mode")
+var inputD = flag.StringP("printDest", "d", "default", "(Optional) Enter printing destination")
+
+var prog_name string
+
+func processArgs(selpg *selpg_args) {
+	//判断是否有页码输入，缺省值为-1
+	if *inputS == -1 || *inputE == -1 {
+		fmt.Fprintf(os.Stderr, "\nError: --start_page(-s) and --end_page(-e) are necessary\n", prog_name)
 		flag.PrintDefaults()
-	}
-	flag.Parse()
-	
-	//handle main arguments
-	if help{
-		flag.Usage()
-	}else if start_page <= 0 {
-		fmt.Fprintf(os.Stderr, "Invalid input argument：-s start_page\n")
-		flag.Usage()
 		os.Exit(1)
-	}else if end_page <= 0 {
-		fmt.Fprintf(os.Stderr, "Invalid input argument：-e end_page\n")
-		flag.Usage()
-		os.Exit(2)
-	}else if start_page > end_page {
-		fmt.Fprintf(os.Stderr, "The start_page cannot be greater than the end_page\n")
-		flag.Usage()
-		os.Exit(3)
 	}
-	
-	if page_length < 1 {
-		fmt.Fprintf(os.Stderr, "Invalid page_length\n")
-		flag.Usage()
-		os.Exit(4)
+	// handle mandatory arg
+	selpg.start_page = *inputS
+	selpg.end_page = *inputE
+	selpg.lines_per_page = *inputL
+	if *inputF == true {
+		selpg.page_type = 'f'
 	}
-	
-	if flag.NArg() > 0{
-		in_filename = flag.Arg(0)
-		file_info, err := os.Stat(in_filename)
-		if err != nil{
-			fmt.Fprintf(os.Stderr, "File not exist, check file path\n")
-			flag.Usage()
-			os.Exit(5)
-		}else{
-			file_mode := file_info.Mode()
-	    		perm := file_mode.Perm()
-			perm_flag := perm & os.FileMode(73) 
-    			if uint32(perm_flag) == uint32(73) {
-    				fmt.Fprintf(os.Stderr, "File does not allow you to read or write, check file path\n")
-				flag.Usage()
-				os.Exit(6)
-			}	 	
+	selpg.printDest = *inputD
+
+	if flag.NArg() >= 1 {
+		if flag.NArg() > 1 {
+			fmt.Fprintf(os.Stderr, "%v: You should have one file input\n", prog_name)
+			os.Exit(1)
 		}
+		_, err := os.Open(flag.Arg(0))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		selpg.inFilename = flag.Arg(0)
 	}
 
-	
-	//process
-	line_ptr := 0
-	page_ptr := 1
-	
-	fin := os.Stdin
-	response := ""	
- 
-	if in_filename != ""{
-		err := errors.New("")
-		fin , err = os.Open(in_filename)
-		if err != nil{
-			fmt.Fprintf(os.Stderr, "Open file fail, try again or check file path\n")
-			flag.Usage()
-			os.Exit(7)	
-		}
-		defer fin.Close()
+	//错误处理
+	switch {
+	case selpg.start_page < 1 || selpg.end_page < 1:
+		fmt.Fprintf(os.Stderr, "/n The page number should be greater than 0\n", prog_name)
+		os.Exit(1)
+	case selpg.lines_per_page <= 1:
+		fmt.Fprintf(os.Stderr, "/n The lines_per_page should be greater than 1\n", prog_name)
+		os.Exit(1)
+	case selpg.end_page < selpg.start_page:
+		fmt.Fprintf(os.Stderr, "/n The end_page should be greater than start_page\n", prog_name)
+		os.Exit(1)
+	case selpg.page_type != 'l' && selpg.page_type != 'f':
+		fmt.Fprintf(os.Stderr, "/n There are only two page_types for you to choose: lines_per_page and pageBreaks\n", prog_name)
+		os.Exit(1)
 	}
-	
-	read_line := bufio.NewReader(fin)
-	if !page_type {
-		for {
-			line, err := read_line.ReadString('\n')
-			if err == io.EOF{
-				break
-			}else if err != nil{
-				fmt.Fprintf(os.Stderr, "Read file error, try again or check file path\n")
-				flag.Usage()
-				os.Exit(8)	
-			}
-			line_ptr++
-			if line_ptr > page_length{
-				page_ptr++
-				line_ptr = 1
-			}
-			if page_ptr >= start_page && page_ptr <= end_page{
-				response += line
-			}
-		}
-	} else{
-		for {
-			page, err := read_line.ReadString('\f')
-			if err == io.EOF{
-				break
-			}else if err != nil{
-				fmt.Fprintf(os.Stderr, "Read file error, try again or check file path\n")
-				flag.Usage()
-				os.Exit(8)	
-			}
-			if page_ptr >= start_page && page_ptr <= end_page{
-				response += page
-			}
-			
-			page_ptr++
-		}
-	}
+}
 
-	//print
-	cmd := exec.Command("cat", "-n")
-	stdin, err := cmd.StdinPipe()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Create pipe error\n")
-		flag.Usage()
-		os.Exit(9)	
+func processInput(selpg *selpg_args) {
+	var inputReader *bufio.Reader
+	var outputWriter *bufio.Writer
+	var err error
+	var cmd *exec.Cmd
+	var stdin io.WriteCloser
+	var file *os.File
+	//输入
+	if selpg.inFilename == "0" {
+		inputReader = bufio.NewReader(os.Stdin)
+	}else {
+		file, err = os.Open(selpg.inFilename)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		inputReader = bufio.NewReader(file)
 	}
-	if print_dest != "" {
-		cmd.Stdout = os.Stdout;
-		cmd.Start()
-		fmt.Fprintf(stdin, response)
+	//输出
+	if selpg.printDest == "default" {
+		outputWriter = bufio.NewWriter(os.Stdout)
+	} else {
+		cmd = exec.Command("lp", "-d", selpg.printDest)
+		stdin, err = cmd.StdinPipe()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	}
+	//begin two input & output loops
+	lineCount, pageCount := 0, 1
+	var line []byte
+	for {
+		if selpg.page_type == 'l' {
+			line, err = inputReader.ReadBytes('\n')
+		} else {
+			line, err = inputReader.ReadBytes('\f')
+		}
+		if err != nil {
+			break
+		}
+		if selpg.page_type == 'l' {
+			lineCount++
+			if lineCount > selpg.lines_per_page {
+				lineCount = 1
+				pageCount++
+			}
+		}
+		if pageCount >= selpg.start_page && pageCount <= selpg.end_page {
+			if selpg.printDest == "default" {
+				outputWriter.Write(line)
+				outputWriter.Flush()
+			} else {
+				_, err := io.WriteString(stdin, string(line))
+				if err != nil {
+					fmt.Fprintln(os.Stderr, err)
+					os.Exit(1)
+				}
+			}
+		}
+		if selpg.page_type == 'f' {
+			pageCount++
+		}
+	}
+	if selpg.printDest != "default" {
 		stdin.Close()
-		cmd.Wait()
-	} else{	
-		fmt.Printf("Content of select pages :\n%s", response)
+		stderr, _ := cmd.CombinedOutput()
+		fmt.Fprintln(os.Stderr, string(stderr))
 	}
+}
+
+func main() {
+	//给程序的参数绑定缺省值
+	selpg := selpg_args{
+		start_page:  -1,
+		end_page:    -1,
+		lines_per_page:    20,
+		page_type:   'l',
+		inFilename: "0",
+		printDest:  "default",
+	}
+	prog_name = os.Args[0]
+	flag.Parse()
+	processArgs(&selpg)
+	processInput(&selpg)
 }
