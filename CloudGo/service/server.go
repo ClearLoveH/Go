@@ -35,7 +35,7 @@ func initRoutes(mx *mux.Router, formatter *render.Render) {
 
 	//对css/js/images的使用
 	mx.PathPrefix("/static").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir(webRoot+"/static/"))))
-	mx.HandleFunc("/today", apitest(formatter)).Methods("GET")
+	mx.HandleFunc("/timeNow", showTime(formatter)).Methods("GET")
 	mx.HandleFunc("/", homeHandle).Methods("GET")
 	mx.HandleFunc("/", Login).Methods("POST")
 	//unknown

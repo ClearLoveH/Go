@@ -8,7 +8,7 @@ import (
 	"github.com/unrolled/render"
 )
 
-func apitest(formatter *render.Render) http.HandlerFunc {
+func showTime(formatter *render.Render) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		formatter.Text(w, http.StatusOK,"The date now is: " +  time.Now().Format("2006/01/02 15:04:05"))
 	}

@@ -1,6 +1,6 @@
 $(document).ready(function() {
     $.ajax({
-        url: "/today"
+        url: "/timeNow"
     }).then(function(data) {
        $('.time').append(data);
     });
