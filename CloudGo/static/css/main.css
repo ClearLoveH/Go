@@ -1,0 +1,22 @@
+body {
+  background-color: #dfe0e3;
+}
+#image{
+    margin:auto;
+    height:200px;
+    width:200px;
+}
+img{
+    height:200px;
+    width:200px;
+}
+p, h1, form{
+    text-align: center;
+    font-size: 20px;
+}
+h1{
+    font-size: 50px;
+}
+input{
+    margin: 10px auto;
+}
